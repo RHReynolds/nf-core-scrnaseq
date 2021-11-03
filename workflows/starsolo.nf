@@ -29,16 +29,16 @@ if( params.genome_fasta ){
         .ifEmpty { exit 1, "Fasta file not found: ${params.genome_fasta}" }
         .collect()
         .set { genome_fasta }
-} 
+}
 
 //Setup Transcript FastA channels
 if( params.transcript_fasta ){
-  Channel
+    Channel
         .fromPath(params.transcript_fasta)
         .ifEmpty { exit 1, "Fasta file not found: ${params.transcript_fasta}" }
         .collect()
         .set { transcriptome_fasta }
-} 
+}
 
 // Check if STAR index is supplied properly
 if( params.star_index  ){
@@ -49,7 +49,7 @@ if( params.star_index  ){
 }
 
 if (!params.star_index && (!params.gtf || !params.genome_fasta)){
-  exit 1, "STAR needs either a GTF + FASTA or a precomputed index supplied."
+    exit 1, "STAR needs either a GTF + FASTA or a precomputed index supplied."
 }
 
 // Create a channel for input read files
@@ -60,7 +60,7 @@ if (params.txp2gene){
       Channel
       .fromPath(params.txp2gene)
       .collect()
-      .set{ ch_txp2gene } 
+      .set{ ch_txp2gene }
 }
 
 // Check AWS batch settings
@@ -112,8 +112,8 @@ include { STAR_ALIGN }                  from '../modules/local/star_align'      
 ////////////////////////////////////////////////////
 /* --    IMPORT NF-CORE MODULES/SUBWORKFLOWS   -- */
 ////////////////////////////////////////////////////
-include { GUNZIP }                      from '../modules/nf-core/software/gunzip/main'              addParams( options: [:] )
-include { STAR_GENOMEGENERATE }         from '../modules/nf-core/software/star/genomegenerate/main' addParams( options: star_genomegenerate_options )
+include { GUNZIP }                      from '../modules/nf-core/modules/gunzip/main'              addParams( options: [:] )
+include { STAR_GENOMEGENERATE }         from '../modules/nf-core/modules/star/genomegenerate/main' addParams( options: star_genomegenerate_options )
 
 
 ////////////////////////////////////////////////////
@@ -146,19 +146,19 @@ workflow STARSOLO {
     * Build STAR index if not supplied
     */
     if (!params.star_index) {
-      STAR_GENOMEGENERATE( genome_fasta, gtf )
-      star_index = STAR_GENOMEGENERATE.out.index
+        STAR_GENOMEGENERATE( genome_fasta, gtf )
+        star_index = STAR_GENOMEGENERATE.out.index
     }
 
     /*
     * Perform mapping with STAR
-    */ 
-    STAR_ALIGN( 
-      ch_fastq,
-      star_index,
-      gtf,
-      ch_barcode_whitelist,
-      protocol
+    */
+    STAR_ALIGN(
+        ch_fastq,
+        star_index,
+        gtf,
+        ch_barcode_whitelist,
+        protocol
     )
     ch_software_versions = ch_software_versions.mix(STAR_ALIGN.out.version.first().ifEmpty(null))
     ch_star_multiqc      = STAR_ALIGN.out.log_final
@@ -190,10 +190,11 @@ workflow STARSOLO {
 ////////////////////////////////////////////////////
 
 workflow.onComplete {
-    Completion.email(workflow, params, params.summary_params, projectDir, log, multiqc_report)
-    Completion.summary(workflow, params, log)
+    if (params.email || params.email_on_fail) {
+        NfcoreTemplate.email(workflow, params, summary_params, projectDir, log, multiqc_report)
+    }
+    NfcoreTemplate.summary(workflow, params, log)
 }
-
 ////////////////////////////////////////////////////
 /* --                  THE END                 -- */
 ////////////////////////////////////////////////////

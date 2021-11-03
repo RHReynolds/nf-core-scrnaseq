@@ -24,7 +24,7 @@ if( params.gtf ){
 
 // Check if TXP2Gene is provided for Alevin
 if (!params.gtf && !params.txp2gene){
-  exit 1, "Must provide either a GTF file ('--gtf') or transcript to gene mapping ('--txp2gene') to align with Alevin"
+    exit 1, "Must provide either a GTF file ('--gtf') or transcript to gene mapping ('--txp2gene') to align with Alevin"
 }
 
 //Setup FastA channels
@@ -34,20 +34,20 @@ if( params.genome_fasta ){
         .ifEmpty { exit 1, "Fasta file not found: ${params.genome_fasta}" }
         .collect()
         .set { genome_fasta }
-} 
+}
 
 //Setup Transcript FastA channels
 if( params.transcript_fasta ){
-  Channel
+    Channel
         .fromPath(params.transcript_fasta)
         .ifEmpty { exit 1, "Fasta file not found: ${params.transcript_fasta}" }
         .collect()
         .set { transcriptome_fasta }
-} 
+}
 
 // Check if files for index building are given if no index is specified
 if (!params.salmon_index && (!params.genome_fasta)) {
-  exit 1, "Must provide a genome fasta file ('--genome_fasta') or a transcript fasta ('--transcript_fasta') if no index is given!"
+    exit 1, "Must provide a genome fasta file ('--genome_fasta') or a transcript fasta ('--transcript_fasta') if no index is given!"
 }
 
 //Setup channel for salmon index if specified
@@ -67,11 +67,8 @@ if (params.txp2gene){
       Channel
       .fromPath(params.txp2gene)
       .collect()
-      .set{ ch_txp2gene } 
+      .set{ ch_txp2gene }
 }
-
-// Check AWS batch settings
-// TODO use the Checks.awsBatch() function instead
 
 // Stage config files
 ch_multiqc_config = file("$projectDir/assets/multiqc_config.yaml", checkIfExists: true)
@@ -123,9 +120,9 @@ include { MULTIQC }                           from '../modules/local/multiqc_ale
 ////////////////////////////////////////////////////
 /* --    IMPORT NF-CORE MODULES/SUBWORKFLOWS   -- */
 ////////////////////////////////////////////////////
-include { GUNZIP }                      from '../modules/nf-core/software/gunzip/main'              addParams( options: [:] )
-include { GFFREAD as GFFREAD_TXP2GENE } from '../modules/nf-core/software/gffread/main'             addParams( options: gffread_txp2gene_options )
-include { SALMON_INDEX }                from '../modules/nf-core/software/salmon/index/main'        addParams( options: salmon_index_options )
+include { GUNZIP }                      from '../modules/nf-core/modules/gunzip/main'              addParams( options: [:] )
+include { GFFREAD as GFFREAD_TXP2GENE } from '../modules/nf-core/modules/gffread/main'             addParams( options: gffread_txp2gene_options )
+include { SALMON_INDEX }                from '../modules/nf-core/modules/salmon/index/main'        addParams( options: salmon_index_options )
 
 ////////////////////////////////////////////////////
 /* --           RUN MAIN WORKFLOW              -- */
@@ -159,7 +156,7 @@ workflow SCRNASEQ_ALEVIN {
         transcriptome_fasta = GFFREAD_TRANSCRIPTOME.out.transcriptome_extracted
         ch_software_versions = ch_software_versions.mix(GFFREAD_TRANSCRIPTOME.out.version.first().ifEmpty(null))
     }
-    
+
     /*
     * Build salmon index
     */
@@ -189,7 +186,7 @@ workflow SCRNASEQ_ALEVIN {
 
     /*
     * Run alevinQC
-    */ 
+    */
     ALEVINQC( SALMON_ALEVIN.out.alevin_results )
     ch_software_versions = ch_software_versions.mix(ALEVINQC.out.version.first().ifEmpty(null))
 
@@ -220,8 +217,10 @@ workflow SCRNASEQ_ALEVIN {
 ////////////////////////////////////////////////////
 
 workflow.onComplete {
-    Completion.email(workflow, params, params.summary_params, projectDir, log, multiqc_report)
-    Completion.summary(workflow, params, log)
+    if (params.email || params.email_on_fail) {
+        NfcoreTemplate.email(workflow, params, summary_params, projectDir, log, multiqc_report)
+    }
+    NfcoreTemplate.summary(workflow, params, log)
 }
 
 ////////////////////////////////////////////////////
