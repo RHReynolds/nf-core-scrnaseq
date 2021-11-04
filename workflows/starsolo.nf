@@ -57,10 +57,10 @@ if (params.input)      { ch_input      = file(params.input)      } else { exit 1
 
 // Check if txp2gene file has been provided
 if (params.txp2gene){
-      Channel
-      .fromPath(params.txp2gene)
-      .collect()
-      .set{ ch_txp2gene }
+    Channel
+        .fromPath(params.txp2gene)
+        .collect()
+        .set{ ch_txp2gene }
 }
 
 // Check AWS batch settings
@@ -80,16 +80,16 @@ whitelist_folder = "$baseDir/assets/whitelist/"
 
 //Automatically set up proper filepaths to the barcode whitelist files bundled with the pipeline
 if (params.protocol.contains("10X") && !params.barcode_whitelist){
-  barcode_filename = "$whitelist_folder/10x_${chemistry}_barcode_whitelist.txt.gz"
-  Channel.fromPath(barcode_filename)
-         .ifEmpty{ exit 1, "Cannot find ${protocol} barcode whitelist: $barcode_filename" }
-         .collect()
-         .set{ barcode_whitelist_gzipped }
+    barcode_filename = "$whitelist_folder/10x_${chemistry}_barcode_whitelist.txt.gz"
+    Channel.fromPath(barcode_filename)
+        .ifEmpty{ exit 1, "Cannot find ${protocol} barcode whitelist: $barcode_filename" }
+        .collect()
+        .set{ barcode_whitelist_gzipped }
 } else if (params.barcode_whitelist){
-  Channel.fromPath(params.barcode_whitelist)
-         .ifEmpty{ exit 1, "Cannot find ${protocol} barcode whitelist: $barcode_filename" }
-         .collect()
-         .set{ ch_barcode_whitelist }
+    Channel.fromPath(params.barcode_whitelist)
+        .ifEmpty{ exit 1, "Cannot find ${protocol} barcode whitelist: $barcode_filename" }
+        .collect()
+        .set{ ch_barcode_whitelist }
 }
 
 ////////////////////////////////////////////////////

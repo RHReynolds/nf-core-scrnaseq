@@ -49,10 +49,10 @@ if (params.kallisto_index) {
 // Kallist gene map
 // Check if txp2gene file has been provided
 if (params.kallisto_gene_map){
-      Channel
-      .fromPath(params.kallisto_gene_map)
-      .collect()
-      .set{ ch_kallisto_gene_map }
+        Channel
+            .fromPath(params.kallisto_gene_map)
+            .collect()
+            .set{ ch_kallisto_gene_map }
 }
 if (!params.gtf && !params.kallisto_gene_map){
     exit 1, "Must provide either a GTF file ('--gtf') or kallisto gene map ('--kallisto_gene_map') to align with kallisto bustools!"
