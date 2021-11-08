@@ -101,6 +101,9 @@ if (params.protocol.contains("10X") && !params.barcode_whitelist){
 ////////////////////////////////////////////////////
 def modules = params.modules.clone()
 
+def cat_fastq_options               = modules['cat_fastq']
+if (!params.save_merged_fastq) { cat_fastq_options['publish_files'] = false }
+
 def salmon_index_options            = modules['salmon_index']
 def gffread_txp2gene_options        = modules['gffread_tx2pgene']
 def salmon_alevin_options           = modules['salmon_alevin']
@@ -121,6 +124,7 @@ include { MULTIQC }                           from '../modules/local/multiqc_ale
 /* --    IMPORT NF-CORE MODULES/SUBWORKFLOWS   -- */
 ////////////////////////////////////////////////////
 include { GUNZIP }                      from '../modules/nf-core/modules/gunzip/main'              addParams( options: [:] )
+include { CAT_FASTQ }                   from '../modules/nf-core/modules/cat/fastq/main'           addParams( options: cat_fastq_options )
 include { GFFREAD as GFFREAD_TXP2GENE } from '../modules/nf-core/modules/gffread/main'             addParams( options: gffread_txp2gene_options )
 include { SALMON_INDEX }                from '../modules/nf-core/modules/salmon/index/main'        addParams( options: salmon_index_options )
 
@@ -141,8 +145,25 @@ workflow SCRNASEQ_ALEVIN {
         [ meta, reads ]
     }
     .groupTuple(by: [0])
-    .map { it -> [ it[0], it[1].flatten() ] }
+    .branch {
+        meta, reads ->
+            single  : reads.size() == 1
+                return [ meta, reads.flatten() ]
+            multiple: reads.size() > 1
+                return [ meta, reads.flatten() ]
+    }
     .set { ch_fastq }
+
+    /*
+     * Concatenate FastQ files from same sample if required
+     */
+    CAT_FASTQ (
+        ch_fastq.multiple
+    )
+    .reads
+    .mix(ch_fastq.single)
+    .set { ch_cat_fastq }
+    ch_software_versions = ch_software_versions.mix(CAT_FASTQ.out.versions.first().ifEmpty(null))
 
     // unzip barcodes
     if (params.protocol.contains("10X") && !params.barcode_whitelist) {
@@ -180,7 +201,13 @@ workflow SCRNASEQ_ALEVIN {
     /*
     * Perform quantification with salmon alevin
     */
-    SALMON_ALEVIN ( ch_fastq, salmon_index_alevin, ch_txp2gene, protocol, ch_barcode_whitelist )
+    SALMON_ALEVIN (
+        ch_cat_fastq,
+        salmon_index_alevin,
+        ch_txp2gene,
+        protocol,
+        ch_barcode_whitelist
+        )
     ch_software_versions = ch_software_versions.mix(SALMON_ALEVIN.out.version.first().ifEmpty(null))
     ch_salmon_multiqc = SALMON_ALEVIN.out.alevin_results
 

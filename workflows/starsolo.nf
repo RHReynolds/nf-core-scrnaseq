@@ -97,6 +97,9 @@ if (params.protocol.contains("10X") && !params.barcode_whitelist){
 ////////////////////////////////////////////////////
 def modules = params.modules.clone()
 
+def cat_fastq_options               = modules['cat_fastq']
+if (!params.save_merged_fastq) { cat_fastq_options['publish_files'] = false }
+
 def star_genomegenerate_options     = modules['star_genomegenerate']
 def star_align_options              = modules['star_align']
 def multiqc_options                 = modules['multiqc_alevin']
@@ -113,6 +116,7 @@ include { STAR_ALIGN }                  from '../modules/local/star_align'      
 /* --    IMPORT NF-CORE MODULES/SUBWORKFLOWS   -- */
 ////////////////////////////////////////////////////
 include { GUNZIP }                      from '../modules/nf-core/modules/gunzip/main'              addParams( options: [:] )
+include { CAT_FASTQ }                   from '../modules/nf-core/modules/cat/fastq/main'           addParams( options: cat_fastq_options )
 include { STAR_GENOMEGENERATE }         from '../modules/nf-core/modules/star/genomegenerate/main' addParams( options: star_genomegenerate_options )
 
 
@@ -133,8 +137,25 @@ workflow STARSOLO {
         [ meta, reads ]
     }
     .groupTuple(by: [0])
-    .map { it -> [ it[0], it[1].flatten() ] }
+    .branch {
+        meta, reads ->
+            single  : reads.size() == 1
+                return [ meta, reads.flatten() ]
+            multiple: reads.size() > 1
+                return [ meta, reads.flatten() ]
+    }
     .set { ch_fastq }
+
+    /*
+     * Concatenate FastQ files from same sample if required
+     */
+    CAT_FASTQ (
+        ch_fastq.multiple
+    )
+    .reads
+    .mix(ch_fastq.single)
+    .set { ch_cat_fastq }
+    ch_software_versions = ch_software_versions.mix(CAT_FASTQ.out.versions.first().ifEmpty(null))
 
     // unzip barcodes
     if (params.protocol.contains("10X") && !params.barcode_whitelist) {
@@ -154,7 +175,7 @@ workflow STARSOLO {
     * Perform mapping with STAR
     */
     STAR_ALIGN(
-        ch_fastq,
+        ch_cat_fastq,
         star_index,
         gtf,
         ch_barcode_whitelist,
