@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased on nf-core/scrnaseq#dsl2
+
 * [#92f7555](https://github.com/RHReynolds/nf-core-scrnaseq/commit/92f7555f73a703e56631fa9a8a80bceb0da961a7) Merge FASTQ files from the same sample.
 * [#67](https://github.com/nf-core/scrnaseq/pull/67) Fix bug causing processing of only one sample
 * [#b5fb831](https://github.com/RHReynolds/nf-core-scrnaseq/commit/b5fb83162f18193a3422c7af6fe61ed790134b63) Add STARsolo files as optional outputs
