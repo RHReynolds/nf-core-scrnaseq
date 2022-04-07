@@ -19,7 +19,7 @@ for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true
 
 /*
 ========================================================================================
-    IMPORT WORKFLOWS
+    IMPORT MODULES/SUBWORKFLOWS
 ========================================================================================
 */
 
@@ -28,6 +28,7 @@ include { KALLISTO_BUSTOOLS } from '../subworkflows/local/kallisto_bustools'
 include { SCRNASEQ_ALEVIN } from '../subworkflows/local/alevin'
 include { STARSOLO } from '../subworkflows/local/starsolo'
 
+include { CAT_FASTQ } from '../modules/nf-core/modules/cat/fastq/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/modules/custom/dumpsoftwareversions/main'
 include { MULTIQC } from "../modules/local/multiqc"
 
@@ -77,9 +78,25 @@ workflow SCRNASEQ {
             [ meta, reads ]
         }
         .groupTuple(by: [0])
-        .map { it -> [ it[0], it[1].flatten() ] }
+        .branch {
+        meta, fastq ->
+            single  : fastq.size() == 1
+                return [ meta, fastq.flatten() ]
+            multiple: fastq.size() > 1
+                return [ meta, fastq.flatten() ]
+        }
 
     ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
+
+    // Concatenate FastQ files from same sample if required
+    CAT_FASTQ (
+        ch_fastq.multiple
+    )
+    .reads
+    .mix(ch_fastq.single)
+    .set { ch_cat_fastq }
+
+    ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first().ifEmpty(null))
 
     // Run kallisto bustools pipeline
     if (params.aligner == "kallisto") {
@@ -91,7 +108,7 @@ workflow SCRNASEQ {
             protocol,
             chemistry,
             kb_workflow,
-            ch_fastq
+            ch_cat_fastq
         )
         ch_versions = ch_versions.mix(KALLISTO_BUSTOOLS.out.ch_versions)
     }
@@ -107,7 +124,7 @@ workflow SCRNASEQ {
             ch_barcode_whitelist,
             protocol,
             chemistry,
-            ch_fastq
+            ch_cat_fastq
         )
         ch_versions = ch_versions.mix(SCRNASEQ_ALEVIN.out.ch_versions)
         ch_multiqc_alevin = SCRNASEQ_ALEVIN.out.for_multiqc
@@ -121,7 +138,7 @@ workflow SCRNASEQ {
             ch_star_index,
             protocol,
             ch_barcode_whitelist,
-            ch_fastq
+            ch_cat_fastq
         )
         ch_versions = ch_versions.mix(STARSOLO.out.ch_versions)
         ch_multiqc_star = STARSOLO.out.for_multiqc
