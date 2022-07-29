@@ -58,7 +58,6 @@ include { MTX_CONVERSION    } from "../subworkflows/local/mtx_conversion"
 //
 // MODULE: Installed directly from nf-core/modules
 //
-//include { CAT_FASTQ } from '../modules/nf-core/modules/cat/fastq/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/modules/custom/dumpsoftwareversions/main'
 include { MULTIQC } from "../modules/local/multiqc"
 

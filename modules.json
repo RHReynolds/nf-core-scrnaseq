@@ -3,9 +3,6 @@
     "homePage": "https://github.com/nf-core/scrnaseq",
     "repos": {
         "nf-core/modules": {
-            "cat/fastq": {
-                "git_sha": "e745e167c1020928ef20ea1397b6b4d230681b4d"
-            },
             "cellranger/count": {
                 "git_sha": "e1a3ae6bf5afce6b23f580e3225e7bdbe1388cd0"
             },
