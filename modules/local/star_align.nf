@@ -8,14 +8,20 @@ process STAR_ALIGN {
         'quay.io/biocontainers/star:2.7.8a--h9ee0642_1' }"
 
     input:
+    //
+    // Input reads are expected to come as: [ meta, [ pair1_read1, pair1_read2, pair2_read1, pair2_read2 ] ]
+    // Input array for a sample is created in the same order reads appear in samplesheet as pairs from replicates are appended to array.
+    //
     tuple val(meta), path(reads)
     path  index
     path  gtf
     path whitelist
     val protocol
+    val other_10x_parameters
 
     output:
     tuple val(meta), path('*d.out.bam')       , emit: bam
+    tuple val(meta), path('*.Solo.out')       , emit: counts
     tuple val(meta), path('*Log.final.out')   , emit: log_final
     tuple val(meta), path('*Log.out')         , emit: log_out
     tuple val(meta), path('*Log.progress.out'), emit: log_progress
@@ -38,15 +44,19 @@ process STAR_ALIGN {
     def seq_center = params.seq_center ? "--outSAMattrRGline ID:$prefix 'CN:$params.seq_center' 'SM:$prefix'" : "--outSAMattrRGline ID:$prefix 'SM:$prefix'"
     def out_sam_type = (args.contains('--outSAMtype')) ? '' : '--outSAMtype BAM Unsorted'
     def mv_unsorted_bam = (args.contains('--outSAMtype BAM Unsorted SortedByCoordinate')) ? "mv ${prefix}.Aligned.out.bam ${prefix}.Aligned.unsort.out.bam" : ''
-    def read_pair = params.protocol.contains("chromium") ? "${reads[1]} ${reads[0]}" : "${reads[0]} ${reads[1]}"
+    // def read_pair = params.protocol.contains("chromium") ? "${reads[1]} ${reads[0]}" : "${reads[0]} ${reads[1]}" -- commented out to be removed is it is not being used
+
+    // separate forward from reverse pairs
+    def (forward, reverse) = reads.collate(2).transpose()
     """
     STAR \\
         --genomeDir $index \\
-        --readFilesIn ${reads[1]} ${reads[0]}  \\
+        --readFilesIn ${reverse.join( "," )} ${forward.join( "," )} \\
         --runThreadN $task.cpus \\
         --outFileNamePrefix $prefix. \\
         --soloCBwhitelist <(gzip -cdf $whitelist) \\
         --soloType $protocol \\
+        $other_10x_parameters \\
         $out_sam_type \\
         $ignore_gtf \\
         $seq_center \\

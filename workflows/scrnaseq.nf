@@ -1,7 +1,7 @@
 /*
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     VALIDATE INPUTS
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
 def summary_params = NfcoreSchema.paramsSummaryMap(workflow, params)
@@ -12,52 +12,76 @@ WorkflowScrnaseq.initialise(params, log)
 def checkPathParamList = [
     params.input, params.multiqc_config, params.genome_fasta, params.gtf,
     params.transcript_fasta, params.salmon_index, params.kallisto_index,
-    params.star_index, params.txp2gene, params.barcode_whitelist
+    params.star_index, params.txp2gene, params.barcode_whitelist, params.cellranger_index
 ]
 for (param in checkPathParamList) { if (param) { file(param, checkIfExists: true) } }
 
 
 /*
+<<<<<<< HEAD
 ========================================================================================
     IMPORT MODULES/SUBWORKFLOWS
 ========================================================================================
+=======
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CONFIG FILES
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>>>>>>> 2e25031bc0125a39c19db0113df221a92f3734cb
 */
 
-include { INPUT_CHECK } from '../subworkflows/local/input_check'
-include { KALLISTO_BUSTOOLS } from '../subworkflows/local/kallisto_bustools'
-include { SCRNASEQ_ALEVIN } from '../subworkflows/local/alevin'
-include { STARSOLO } from '../subworkflows/local/starsolo'
+ch_multiqc_config        = file("$projectDir/assets/multiqc_config.yml", checkIfExists: true)
+ch_multiqc_custom_config = params.multiqc_config ? Channel.fromPath(params.multiqc_config) : Channel.empty()
 
-include { CAT_FASTQ } from '../modules/nf-core/modules/cat/fastq/main'
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    IMPORT LOCAL MODULES/SUBWORKFLOWS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+//
+// SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
+//
+include { INPUT_CHECK       } from '../subworkflows/local/input_check'
+include { FASTQC_CHECK } from '../subworkflows/local/fastqc'
+include { KALLISTO_BUSTOOLS } from '../subworkflows/local/kallisto_bustools'
+include { SCRNASEQ_ALEVIN   } from '../subworkflows/local/alevin'
+include { STARSOLO          } from '../subworkflows/local/starsolo'
+include { CELLRANGER_ALIGN  } from "../subworkflows/local/align_cellranger"
+include { MTX_CONVERSION    } from "../subworkflows/local/mtx_conversion"
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    IMPORT NF-CORE MODULES/SUBWORKFLOWS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+//
+// MODULE: Installed directly from nf-core/modules
+//
+//include { CAT_FASTQ } from '../modules/nf-core/modules/cat/fastq/main'
 include { CUSTOM_DUMPSOFTWAREVERSIONS } from '../modules/nf-core/modules/custom/dumpsoftwareversions/main'
 include { MULTIQC } from "../modules/local/multiqc"
 
 /*
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
 // Info required for completion email and summary
-def multiqc_report = []
-ch_multiqc_config = file("$projectDir/assets/multiqc_config.yaml", checkIfExists: true)
-ch_multiqc_custom_config = params.multiqc_config ? file(params.multiqc_config) : []
+// TODO: Are this channels still necessary?
 ch_output_docs = file("$projectDir/docs/output.md", checkIfExists: true)
 ch_output_docs_images = file("$projectDir/docs/images/", checkIfExists: true)
-(protocol, chemistry) = WorkflowScrnaseq.formatProtocol(params.protocol, params.aligner)
+(protocol, chemistry, other_parameters) = WorkflowScrnaseq.formatProtocol(params.protocol, params.aligner)
 
+// general input and params
 ch_input = file(params.input)
 ch_genome_fasta = params.genome_fasta ? file(params.genome_fasta) : []
 ch_gtf = params.gtf ? file(params.gtf) : []
-ch_kallisto_index = params.kallisto_index ? file(params.kallisto_index) : []
 ch_transcript_fasta = params.transcript_fasta ? file(params.transcript_fasta): []
-ch_salmon_index = params.salmon_index ? file(params.salmon_index) : []
-ch_txp2gene = params.txp2gene ? file(txp2gene) : []
-ch_star_index = params.star_index ? file(params.star_index) : []
+ch_txp2gene = params.txp2gene ? file(params.txp2gene) : []
 ch_multiqc_alevin = []
 ch_multiqc_star = []
-kb_workflow = params.kb_workflow
-
 if (params.barcode_whitelist) {
     ch_barcode_whitelist = file(params.barcode_whitelist)
 } else if (params.protocol.contains("10X")) {
@@ -66,37 +90,38 @@ if (params.barcode_whitelist) {
     ch_barcode_whitelist = []
 }
 
+
+//kallisto params
+ch_kallisto_index = params.kallisto_index ? file(params.kallisto_index) : []
+kb_workflow = params.kb_workflow
+
+//salmon params
+ch_salmon_index = params.salmon_index ? file(params.salmon_index) : []
+
+//star params
+ch_star_index = params.star_index ? file(params.star_index) : []
+
+//cellranger params
+ch_cellranger_index = params.cellranger_index ? file(params.cellranger_index) : []
+
+
 workflow SCRNASEQ {
 
-    ch_versions = Channel.empty()
+    ch_versions     = Channel.empty()
+    ch_mtx_matrices = Channel.empty()
 
     // Check input files and stage input data
-    ch_fastq = INPUT_CHECK( ch_input )
-        .reads
-        .map {
-            meta, reads -> meta.id = meta.id.split('_')[0..-2].join('_')
-            [ meta, reads ]
-        }
-        .groupTuple(by: [0])
-        .branch {
-        meta, fastq ->
-            single  : fastq.size() == 1
-                return [ meta, fastq.flatten() ]
-            multiple: fastq.size() > 1
-                return [ meta, fastq.flatten() ]
-        }
+    ch_fastq = INPUT_CHECK( ch_input ).reads
 
     ch_versions = ch_versions.mix(INPUT_CHECK.out.versions)
 
-    // Concatenate FastQ files from same sample if required
-    CAT_FASTQ (
-        ch_fastq.multiple
-    )
-    .reads
-    .mix(ch_fastq.single)
-    .set { ch_cat_fastq }
-
-    ch_versions = ch_versions.mix(CAT_FASTQ.out.versions.first().ifEmpty(null))
+    // Run FastQC
+    ch_multiqc_fastqc = Channel.empty()
+    if (!params.skip_fastqc){
+      FASTQC_CHECK ( ch_fastq )
+      ch_versions = ch_versions.mix(FASTQC_CHECK.out.fastqc_version)
+      ch_multiqc_fastqc    = FASTQC_CHECK.out.fastqc_multiqc.ifEmpty([])
+    }
 
     // Run kallisto bustools pipeline
     if (params.aligner == "kallisto") {
@@ -108,9 +133,10 @@ workflow SCRNASEQ {
             protocol,
             chemistry,
             kb_workflow,
-            ch_cat_fastq
+            ch_fastq
         )
         ch_versions = ch_versions.mix(KALLISTO_BUSTOOLS.out.ch_versions)
+        ch_mtx_matrices = ch_mtx_matrices.mix(KALLISTO_BUSTOOLS.out.counts)
     }
 
     // Run salmon alevin pipeline
@@ -124,10 +150,11 @@ workflow SCRNASEQ {
             ch_barcode_whitelist,
             protocol,
             chemistry,
-            ch_cat_fastq
+            ch_fastq
         )
         ch_versions = ch_versions.mix(SCRNASEQ_ALEVIN.out.ch_versions)
         ch_multiqc_alevin = SCRNASEQ_ALEVIN.out.for_multiqc
+        ch_mtx_matrices = ch_mtx_matrices.mix(SCRNASEQ_ALEVIN.out.alevin_results)
     }
 
     // Run STARSolo pipeline
@@ -138,11 +165,31 @@ workflow SCRNASEQ {
             ch_star_index,
             protocol,
             ch_barcode_whitelist,
-            ch_cat_fastq
+            ch_fastq,
+            other_parameters
         )
         ch_versions = ch_versions.mix(STARSOLO.out.ch_versions)
+        ch_mtx_matrices = ch_mtx_matrices.mix(STARSOLO.out.star_counts)
         ch_multiqc_star = STARSOLO.out.for_multiqc
     }
+
+    // Run cellranger pipeline
+    if (params.aligner == "cellranger") {
+        CELLRANGER_ALIGN(
+            ch_genome_fasta,
+            ch_gtf,
+            ch_cellranger_index,
+            ch_fastq
+        )
+        ch_versions = ch_versions.mix(CELLRANGER_ALIGN.out.ch_versions)
+        ch_mtx_matrices = ch_mtx_matrices.mix(CELLRANGER_ALIGN.out.cellranger_out)
+    }
+
+    // Run mtx to h5ad conversion subworkflow
+    MTX_CONVERSION (
+        ch_mtx_matrices,
+        ch_input
+    )
 
     // collect software versions
     CUSTOM_DUMPSOFTWAREVERSIONS (
@@ -150,15 +197,17 @@ workflow SCRNASEQ {
     )
 
     if (!params.skip_multiqc) {
+
         ch_workflow_summary = Channel.value(
             WorkflowScrnaseq.paramsSummaryMultiqc(workflow, summary_params)
         ).collectFile(name: 'workflow_summary_mqc.yaml')
 
         MULTIQC(
             ch_multiqc_config,
-            ch_multiqc_custom_config,
+            ch_multiqc_custom_config.collect().ifEmpty([]),
             CUSTOM_DUMPSOFTWAREVERSIONS.out.mqc_yml.collect(),
             ch_workflow_summary,
+            ch_multiqc_fastqc.collect{it[0]}.ifEmpty([]),
             ch_multiqc_alevin,
             ch_multiqc_star
         )
@@ -167,9 +216,9 @@ workflow SCRNASEQ {
 }
 
 /*
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     COMPLETION EMAIL AND SUMMARY
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
 workflow.onComplete {
@@ -180,7 +229,7 @@ workflow.onComplete {
 }
 
 /*
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     THE END
-========================================================================================
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */

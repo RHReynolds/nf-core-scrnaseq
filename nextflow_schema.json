@@ -10,17 +10,19 @@
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
+            "required": ["input", "outdir"],
             "properties": {
                 "input": {
                     "type": "string",
+                    "mimetype": "text/csv",
                     "fa_icon": "fas fa-dna",
                     "description": "Input FastQ files",
                     "help_text": "Use this to specify the location of your input FastQ files. For example:\n\n```bash\n--input 'path/to/data/sample_*_{1,2}.fastq'\n```\n\nPlease note the following requirements:\n\n1. The path must be enclosed in quotes\n2. The path must have at least one `*` wildcard character\n3. When using the pipeline with paired end data, the path must use `{1,2}` notation to specify read pairs.\n\nIf left unspecified, a default pattern is used: `data/*{1,2}.fastq.gz`"
                 },
                 "outdir": {
                     "type": "string",
-                    "description": "Path to the output directory where the results will be saved.",
-                    "default": "./results",
+                    "format": "directory-path",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
                     "fa_icon": "fas fa-folder-open"
                 },
                 "email": {
@@ -59,23 +61,14 @@
                     "default": "alevin",
                     "help_text": "The workflow can handle three types of methods:\n\n- Kallisto/Bustools\n- Salmon Alevin + AlevinQC\n- STARsolo\n\nTo choose which one to use, please specify either `alevin`, `star` or `kallisto` as a parameter option for `--aligner`. By default, the pipeline runs the `alevin` option. Note that specifying another aligner option also requires choosing appropriate parameters (see below) for the selected option.",
                     "fa_icon": "fas fa-align-center",
-                    "enum": [
-                        "kallisto",
-                        "star",
-                        "alevin",
-                        "cellranger"
-                    ]
+                    "enum": ["kallisto", "star", "alevin", "cellranger"]
                 },
                 "protocol": {
                     "type": "string",
+                    "description": "The protocol that was used to generate the single cell data, e.g. 10XV2 (default).",
                     "default": "10XV2",
                     "fa_icon": "fas fa-cogs",
-                    "enum": [
-                        "10XV3",
-                        "10XV2",
-                        "10XV1",
-                        "dropseq"
-                    ]
+                    "enum": ["10XV3", "10XV2", "10XV1", "dropseq"]
                 }
             },
             "fa_icon": "fas fa-terminal"
@@ -165,7 +158,8 @@
                     "fa_icon": "fas fa-asterisk"
                 },
                 "star_ignore_sjdbgtf": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Ignore the SJDB GTF file."
                 }
             },
             "fa_icon": "fas fa-star"
@@ -202,13 +196,19 @@
                     "default": "standard",
                     "description": "Type of workflow. Use `lamanno` for RNA velocity based on La Manno et al. 2018 logic. Use `nucleus` for RNA velocity on single-nucleus RNA-seq reads. Use `kite` for feature barcoding. Use `kite: 10xFB` for 10x Genomics Feature Barcoding technology. (default: standard)",
                     "fa_icon": "fas fa-fish",
-                    "enum": [
-                        "standard",
-                        "lamanno",
-                        "nucleus",
-                        "kite",
-                        "kite: 10xFB"
-                    ]
+                    "enum": ["standard", "lamanno", "nucleus", "kite", "kite: 10xFB"]
+                }
+            }
+        },
+        "cellranger_options": {
+            "title": "Cellranger Options",
+            "type": "object",
+            "description": "Params related to the Cellranger pipeline",
+            "default": "",
+            "properties": {
+                "cellranger_index": {
+                    "type": "string",
+                    "description": "Specify a pre-calculated cellranger index. Readily prepared indexes can be obtained from the 10x Genomics website. "
                 }
             }
         },
@@ -377,6 +377,14 @@
                     "description": "Run this workflow with Conda. You can also use '-profile conda' instead of providing this parameter.",
                     "hidden": true,
                     "fa_icon": "fas fa-bacon"
+                },
+                "skip_fastqc": {
+                    "type": "boolean",
+                    "description": "Skip the FastQC reporting feature in the pipeline."
+                },
+                "skip_multiqc": {
+                    "type": "boolean",
+                    "description": "Skip the MultiQC reporting feature in the pipeline."
                 }
             }
         }
@@ -401,6 +409,9 @@
             "$ref": "#/definitions/kallisto_bus_options"
         },
         {
+            "$ref": "#/definitions/cellranger_options"
+        },
+        {
             "$ref": "#/definitions/institutional_config_options"
         },
         {
@@ -409,13 +420,5 @@
         {
             "$ref": "#/definitions/generic_options"
         }
-    ],
-    "properties": {
-        "skip_multiqc": {
-            "type": "boolean"
-        },
-        "seq_center": {
-            "type": "string"
-        }
-    }
+    ]
 }

@@ -16,6 +16,7 @@ workflow STARSOLO {
     protocol
     barcode_whitelist
     ch_fastq
+    other_10x_parameters
 
     main:
     ch_versions = Channel.empty()
@@ -42,7 +43,8 @@ workflow STARSOLO {
         star_index,
         gtf,
         barcode_whitelist,
-        protocol
+        protocol,
+        other_10x_parameters
     )
     ch_versions = ch_versions.mix(STAR_ALIGN.out.versions)
 
@@ -50,6 +52,7 @@ workflow STARSOLO {
     emit:
     ch_versions
     star_result = STAR_ALIGN.out.tab
+    star_counts = STAR_ALIGN.out.counts
     for_multiqc = STAR_ALIGN.out.log_final.collect{it[1]}.ifEmpty([])
 
 
