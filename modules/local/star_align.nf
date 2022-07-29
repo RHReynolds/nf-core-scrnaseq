@@ -32,9 +32,6 @@ process STAR_ALIGN {
     tuple val(meta), path('*Aligned.unsort.out.bam') , optional:true, emit: bam_unsorted
     tuple val(meta), path('*fastq.gz')               , optional:true, emit: fastq
     tuple val(meta), path('*.tab')                   , optional:true, emit: tab
-    // Publish Solo.out files if created
-    // If outputting SJ.out files change publish_dir_mode = 'copyNoFollow' to permit copying of symlinks
-    tuple val(meta), path('*Solo.out')               , optional:true, emit: solo_dir
 
 
     script:
