@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [#92f7555](https://github.com/RHReynolds/nf-core-scrnaseq/commit/92f7555f73a703e56631fa9a8a80bceb0da961a7) Merge FASTQ files from the same sample --> deprecated, resolved in [#60aeed7b](https://github.com/nf-core/scrnaseq/commit/60aeed7b3bfaa967512de944e24a7ce90c40063f) and [#6d9caad](https://github.com/nf-core/scrnaseq/commit/6d9caade906a386b9c5e1165b952fb9c20eb578e)
 - [#67](https://github.com/nf-core/scrnaseq/pull/67) Fix bug causing processing of only one sample --> deprecated, resolved in [#77](https://github.com/nf-core/scrnaseq/pull/77)
 - [#b5fb831](https://github.com/RHReynolds/nf-core-scrnaseq/commit/b5fb83162f18193a3422c7af6fe61ed790134b63) Add STARsolo files as optional outputs --> redundant, resolved in [#88289cc](https://github.com/nf-core/scrnaseq/tree/88289cca2fea04aed10fe00786ade69c83202613)
+- [#a83a73c](https://github.com/RHReynolds/nf-core-scrnaseq/commit/a83a73c33394856e0544de1bad9ed15ac43c930b) Make matrix conversion optional.
 
 ## v2.0.1dev
 
