@@ -179,10 +179,12 @@ workflow SCRNASEQ {
     }
 
     // Run mtx to h5ad conversion subworkflow
-    MTX_CONVERSION (
-        ch_mtx_matrices,
-        ch_input
-    )
+    if (!params.skip_mtx_conversion) {
+        MTX_CONVERSION (
+            ch_mtx_matrices,
+            ch_input
+        )
+    }
 
     // collect software versions
     CUSTOM_DUMPSOFTWAREVERSIONS (
