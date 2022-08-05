@@ -380,6 +380,10 @@
                 "skip_multiqc": {
                     "type": "boolean",
                     "description": "Skip the MultiQC reporting feature in the pipeline."
+                },
+                "skip_mtx_conversion": {
+                    "type": "boolean",
+                    "description": "Skip the matrix conversion feature in the pipeline."
                 }
             }
         }
